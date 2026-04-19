@@ -129,6 +129,8 @@ async def _stream_session(
             # ── Market lifecycle events ───────────────────────────────────
             elif msg_type == "market_lifecycle_v2" and ticker:
                 event_type: str = data.get("event_type", "")
+                if ticker not in orderbooks:
+                    continue  # platform-wide broadcast — ignore other markets
                 log.info("Market lifecycle %s event_type=%s", ticker, event_type)
 
                 if event_type == "determined":
