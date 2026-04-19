@@ -41,7 +41,7 @@ log = logging.getLogger(__name__)
 WS_URL = "wss://api.elections.kalshi.com/trade-api/ws/v2"
 WS_PATH = "/trade-api/ws/v2"
 STREAM_DURATION = int(os.environ.get("STREAM_DURATION_SECONDS", "21000"))
-COMMIT_INTERVAL = 900  # seconds between periodic commits (~15 min)
+COMMIT_INTERVAL = 60  # seconds between periodic commits
 DISCOVERY_RETRY_WAIT = 30  # seconds to wait if no open markets found
 
 

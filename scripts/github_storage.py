@@ -36,40 +36,49 @@ def append_record(ticker: str, record: dict, ts: float | None = None) -> None:
         fh.write(json.dumps(record) + "\n")
 
 
-def _run(cmd: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True, text=True)
+def _check(cmd: list[str]) -> int:
+    """Run a command and return its exit code; output flows to the Actions log."""
+    result = subprocess.run(cmd, cwd=str(REPO_ROOT))
+    return result.returncode
+
+
+def _has_staged_changes() -> bool:
+    """Return True if there are staged changes ready to commit."""
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--quiet"],
+        cwd=str(REPO_ROOT),
+    )
+    return result.returncode != 0  # non-zero means there ARE changes
 
 
 def commit_data(message: str) -> bool:
     """Stage data/ and commit+push if running inside GitHub Actions.
 
     Returns True if a commit was made, False otherwise.
+    All git output is forwarded to stdout so failures are visible in the Actions log.
     """
     if not os.environ.get("GITHUB_ACTIONS"):
         print("[storage] Not in GitHub Actions — skipping git commit.")
         return False
 
-    _run(["git", "add", str(DATA_DIR)])
+    _check(["git", "add", str(DATA_DIR)])
 
-    diff = _run(["git", "diff", "--cached", "--quiet"])
-    if diff.returncode == 0:
+    if not _has_staged_changes():
         print("[storage] Nothing to commit.")
         return False
 
-    result = _run(["git", "commit", "-m", message])
-    if result.returncode != 0:
-        print(f"[storage] Commit failed: {result.stderr.strip()}")
+    if _check(["git", "commit", "-m", message]) != 0:
+        print("[storage] Commit failed (see git output above).")
         return False
 
     # Push with up to 3 retries; pull --rebase on conflict.
     for attempt in range(1, 4):
-        push = _run(["git", "push"])
-        if push.returncode == 0:
+        if _check(["git", "push"]) == 0:
             print(f"[storage] Pushed: {message}")
             return True
         print(f"[storage] Push attempt {attempt} failed, rebasing…")
-        _run(["git", "pull", "--rebase"])
+        _check(["git", "pull", "--rebase"])
         time.sleep(2 ** attempt)
 
-    print("[storage] Push failed after retries.")
+    print("[storage] Push failed after retries (see git output above).")
     return False
