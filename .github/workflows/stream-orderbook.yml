@@ -1,0 +1,67 @@
+name: Stream Kalshi Orderbook
+
+on:
+  # Four non-overlapping 6-hour windows cover the full day.
+  schedule:
+    - cron: '0 0 * * *'   # 00:00 UTC
+    - cron: '0 6 * * *'   # 06:00 UTC
+    - cron: '0 12 * * *'  # 12:00 UTC
+    - cron: '0 18 * * *'  # 18:00 UTC
+  # Manual trigger for testing — set duration via the input below.
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Stream duration in seconds (default: 21000 ≈ 5h 50m)'
+        required: false
+        default: '21000'
+
+jobs:
+  stream:
+    runs-on: ubuntu-latest
+    # Hard cap just under GitHub's 6-hour job limit.
+    timeout-minutes: 355
+
+    permissions:
+      contents: write   # needed to push data commits back to the repo
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          # Persist credentials so git push works inside the streamer.
+          persist-credentials: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Configure git identity for data commits
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Stream orderbook data
+        run: python scripts/stream_orderbook.py
+        env:
+          KALSHI_API_KEY_ID: ${{ secrets.KALSHI_API_KEY_ID }}
+          KALSHI_PRIVATE_KEY: ${{ secrets.KALSHI_PRIVATE_KEY }}
+          STREAM_DURATION_SECONDS: ${{ github.event.inputs.duration || '21000' }}
+
+      # Flush any data that was written but not yet committed
+      # (e.g. markets still open when the duration timer fired).
+      - name: Final data flush
+        if: always()
+        run: |
+          git add data/ 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "data: final flush $(date -u '+%Y-%m-%d %H:%M') UTC"
+            git push || (git pull --rebase && git push)
+          else
+            echo "No uncommitted data to flush."
+          fi
