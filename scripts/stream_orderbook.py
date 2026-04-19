@@ -85,6 +85,8 @@ async def _stream_session(
         for t in tickers:
             orderbooks.setdefault(t, OrderbookState(t))
 
+        raw_logged = 0  # log first few raw messages to verify wire format
+
         async for raw in ws:
             now = time.time()
 
@@ -97,6 +99,11 @@ async def _stream_session(
             except json.JSONDecodeError:
                 log.warning("Non-JSON message: %.120s", raw)
                 continue
+
+            # Log the first 3 messages verbatim so we can see Kalshi's wire format.
+            if raw_logged < 3:
+                log.info("RAW[%d] %s", raw_logged, json.dumps(envelope)[:400])
+                raw_logged += 1
 
             msg_type: str = envelope.get("type", "")
             data: dict = envelope.get("msg", {})
@@ -111,7 +118,8 @@ async def _stream_session(
                     ob.apply_snapshot(data)
                     record = ob.to_snapshot_record(now)
                     append_record(ticker, record, now)
-                    log.debug("Snapshot %s seq=%d", ticker, ob.seq)
+                    log.info("Snapshot %s seq=%d yes_levels=%d no_levels=%d",
+                             ticker, ob.seq, len(ob.yes), len(ob.no))
 
                 elif sub_type == "delta":
                     ob.apply_delta(data)
@@ -120,9 +128,10 @@ async def _stream_session(
 
             # ── Market lifecycle events ───────────────────────────────────
             elif msg_type == "market_lifecycle_v2" and ticker:
-                status: str = data.get("status", "")
-                log.info("Market %s → %s", ticker, status)
+                # Log full data dict to see which field carries the status.
+                log.info("Market lifecycle %s data=%s", ticker, json.dumps(data)[:200])
 
+                status: str = data.get("status", data.get("market_status", ""))
                 if status in ("closed", "settled"):
                     dt = datetime.fromtimestamp(now, tz=timezone.utc)
                     commit_data(
@@ -142,7 +151,9 @@ async def _stream_session(
             # ── Periodic commit ───────────────────────────────────────────
             if time.monotonic() - last_commit_ref[0] >= COMMIT_INTERVAL:
                 dt = datetime.fromtimestamp(now, tz=timezone.utc)
-                commit_data(f"data: periodic {dt.strftime('%Y-%m-%d %H:%M')} UTC")
+                label = f"data: periodic {dt.strftime('%Y-%m-%d %H:%M')} UTC"
+                log.info("Triggering periodic commit: %s", label)
+                commit_data(label)
                 last_commit_ref[0] = time.monotonic()
 
 
