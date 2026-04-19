@@ -29156,3 +29156,4 @@
 {"type": "delta", "ts": 1776562942.2137702, "ticker": "KXETH15M-26APR182145-45", "seq": 137460, "side": "no"}
 {"type": "delta", "ts": 1776562942.2140584, "ticker": "KXETH15M-26APR182145-45", "seq": 137463, "side": "yes"}
 {"type": "delta", "ts": 1776562942.2141547, "ticker": "KXETH15M-26APR182145-45", "seq": 137464, "side": "yes"}
+{"type": "delta", "ts": 1776562945.2562478, "ticker": "KXETH15M-26APR182145-45", "seq": 137486, "side": "yes"}
