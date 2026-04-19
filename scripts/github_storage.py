@@ -18,14 +18,22 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).parent.parent
 DATA_DIR = REPO_ROOT / "data"
 
+# Cache ticker → Path so a market that spans midnight always writes to the
+# same file (determined by the timestamp of its first record, not wall-clock).
+_path_cache: dict[str, Path] = {}
+
 
 def _data_path(ticker: str, ts: float) -> Path:
     """Return (and create) the JSONL file path for a given ticker and timestamp."""
+    if ticker in _path_cache:
+        return _path_cache[ticker]
     dt = datetime.fromtimestamp(ts, tz=timezone.utc)
     series = ticker.split("-")[0]  # e.g. "KXBTC15M"
     dir_path = DATA_DIR / series / dt.strftime("%Y-%m-%d")
     dir_path.mkdir(parents=True, exist_ok=True)
-    return dir_path / f"{ticker}.jsonl"
+    path = dir_path / f"{ticker}.jsonl"
+    _path_cache[ticker] = path
+    return path
 
 
 def append_record(ticker: str, record: dict, ts: float | None = None) -> None:
