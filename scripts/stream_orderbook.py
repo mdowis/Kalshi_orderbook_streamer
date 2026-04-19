@@ -160,8 +160,7 @@ async def run() -> None:
         except websockets.exceptions.ConnectionClosed as exc:
             log.warning("Connection closed (%s); reconnecting in %.0fs.", exc, backoff)
         except Exception as exc:
-            log.error("Unexpected error (%s: %s); reconnecting in %.0fs.",
-                      type(exc).__name__, exc, backoff)
+            log.exception("Unexpected error — reconnecting in %.0fs.", backoff)
 
         remaining = STREAM_DURATION - (time.monotonic() - start_time)
         if remaining <= 0:
@@ -173,4 +172,5 @@ async def run() -> None:
 
 
 if __name__ == "__main__":
+    log.info("Starting streamer — duration=%ds commit_interval=%ds", STREAM_DURATION, COMMIT_INTERVAL)
     asyncio.run(run())
