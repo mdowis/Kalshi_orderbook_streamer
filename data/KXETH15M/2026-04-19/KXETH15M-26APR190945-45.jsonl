@@ -11934,3 +11934,4 @@
 {"type": "snapshot", "ts": 1776606308.0141306, "ticker": "KXETH15M-26APR190945-45", "seq": 159064, "yes": [], "no": []}
 {"type": "lifecycle", "ts": 1776606308.0142522, "ticker": "KXETH15M-26APR190945-45", "seq": 3124, "event_type": "determined", "determination_ts": 1776606306, "result": "no", "settlement_value": "0.0000"}
 {"type": "meta", "ticker": "KXETH15M-26APR190945-45", "series_ticker": null, "title": "ETH price up in next 15 mins?", "yes_sub_title": "Target Price: $2,342.41", "no_sub_title": "Target price: TBD", "floor_strike": 2342.41, "cap_strike": null, "strike_type": "greater_or_equal", "open_time": "2026-04-19T13:30:00Z", "close_time": "2026-04-19T13:45:00Z", "expiration_time": "2026-04-26T13:45:00Z", "market_type": "binary", "result": "", "status": "closed", "ts": 1776606308.0142522}
+{"type": "lifecycle", "ts": 1776606314.3033361, "ticker": "KXETH15M-26APR190945-45", "seq": 3132, "event_type": "settled", "settled_ts": 1776606314}
