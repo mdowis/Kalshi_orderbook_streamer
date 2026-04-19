@@ -12222,3 +12222,4 @@
 {"type": "delta", "ts": 1776562591.346091, "ticker": "KXETH15M-26APR182145-45", "seq": 79024, "side": "no"}
 {"type": "delta", "ts": 1776562591.3461926, "ticker": "KXETH15M-26APR182145-45", "seq": 79025, "side": "yes"}
 {"type": "delta", "ts": 1776562591.346293, "ticker": "KXETH15M-26APR182145-45", "seq": 79026, "side": "yes"}
+{"type": "delta", "ts": 1776562594.5148969, "ticker": "KXETH15M-26APR182145-45", "seq": 79054, "side": "no"}
