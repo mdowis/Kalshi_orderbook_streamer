@@ -64,9 +64,10 @@ def reconstruct(ticker: str, at_ts: float | None = None) -> dict | None:
 
     yes: dict[str, str] = {}
     no:  dict[str, str] = {}
-    seq    = 0
-    last_ts = 0.0
-    found  = False
+    seq          = 0
+    last_ts      = 0.0
+    found        = False
+    has_snapshot = False  # deltas before the first snapshot are not applicable
 
     with path.open() as fh:
         for raw in fh:
@@ -89,20 +90,37 @@ def reconstruct(ticker: str, at_ts: float | None = None) -> dict | None:
                 last_ts = ts
                 yes    = {p: s for p, s in record.get("yes", [])}
                 no     = {p: s for p, s in record.get("no",  [])}
-                found  = True
+                found        = True
+                has_snapshot = True
 
-            elif rtype == "delta":
+            elif rtype == "delta" and has_snapshot:
                 seq    = record.get("seq", seq + 1)
                 last_ts = ts
-                side   = record.get("side", "")
-                price  = record.get("price", "")
-                delta  = float(record.get("delta", 0))
-                levels = yes if side == "yes" else no
-                new    = float(levels.get(price, "0")) + delta
-                if new <= 0:
-                    levels.pop(price, None)
+
+                # Format 1: partial level lists (yes_dollars_fp / no_dollars_fp)
+                if "yes_dollars_fp" in record or "no_dollars_fp" in record:
+                    for p, s in record.get("yes_dollars_fp", []):
+                        if float(s) <= 0:
+                            yes.pop(p, None)
+                        else:
+                            yes[p] = s
+                    for p, s in record.get("no_dollars_fp", []):
+                        if float(s) <= 0:
+                            no.pop(p, None)
+                        else:
+                            no[p] = s
                 else:
-                    levels[price] = f"{new:.2f}"
+                    # Format 2: single price + additive delta
+                    side  = record.get("side", "")
+                    price = record.get("price", "")
+                    delta = float(record.get("delta", 0))
+                    if price:
+                        levels = yes if side == "yes" else no
+                        new    = float(levels.get(price, "0")) + delta
+                        if new <= 0:
+                            levels.pop(price, None)
+                        else:
+                            levels[price] = f"{new:.2f}"
                 found = True
 
     if not found:
