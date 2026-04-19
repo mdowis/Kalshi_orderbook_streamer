@@ -2262,3 +2262,5 @@
 {"type": "delta", "ts": 1776562323.889686, "ticker": "KXETH15M-26APR182145-45", "seq": 42904, "side": "yes"}
 {"type": "delta", "ts": 1776562324.844034, "ticker": "KXETH15M-26APR182145-45", "seq": 42907, "side": "yes"}
 {"type": "delta", "ts": 1776562324.8441598, "ticker": "KXETH15M-26APR182145-45", "seq": 42908, "side": "yes"}
+{"type": "delta", "ts": 1776562325.7433355, "ticker": "KXETH15M-26APR182145-45", "seq": 42939, "side": "no"}
+{"type": "delta", "ts": 1776562325.743435, "ticker": "KXETH15M-26APR182145-45", "seq": 42940, "side": "no"}
