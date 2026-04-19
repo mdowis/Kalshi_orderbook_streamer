@@ -7,14 +7,13 @@ but skips commits (CI=false / GITHUB_ACTIONS not set).
 
 from __future__ import annotations
 
-import json
 import os
+import json
 import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Root of the git working tree — the directory that contains data/.
 REPO_ROOT = Path(__file__).parent.parent
 DATA_DIR = REPO_ROOT / "data"
 
@@ -24,18 +23,11 @@ _path_cache: dict[str, Path] = {}
 
 
 def _data_path(ticker: str, ts: float) -> Path:
-    """Return (and create) the JSONL file path for a given ticker and timestamp.
-
-    If a file for this ticker already exists on disk (e.g. from a previous
-    process run that started before midnight), reuse that path so the market's
-    data stays in one file and git doesn't detect a rename.
-    """
+    """Return (and create) the JSONL file path for a given ticker and timestamp."""
     if ticker in _path_cache:
         return _path_cache[ticker]
 
-    series = ticker.split("-")[0]  # e.g. "KXBTC15M"
-
-    # Prefer an existing file over creating a new dated one.
+    series = ticker.split("-")[0]
     existing = sorted((DATA_DIR / series).rglob(f"{ticker}.jsonl"))
     if existing:
         path = existing[0]
@@ -60,10 +52,7 @@ def append_record(ticker: str, record: dict, ts: float | None = None) -> None:
 # ── Git helpers ───────────────────────────────────────────────────────────────
 
 def _run(cmd: list[str], capture: bool = False) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        cmd, cwd=str(REPO_ROOT),
-        capture_output=capture, text=capture,
-    )
+    return subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=capture, text=capture)
 
 
 def _check(cmd: list[str]) -> int:
@@ -75,103 +64,101 @@ def _has_staged_changes() -> bool:
 
 
 def _current_branch() -> str:
-    r = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture=True)
-    return r.stdout.strip()
+    return _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture=True).stdout.strip()
 
 
-def _recover_detached_head() -> None:
-    """If a prior failed rebase left us in detached HEAD, get back on the branch."""
-    # Always abort any in-progress rebase first so git is in a clean state.
+def _target_branch() -> str:
+    """Branch this Actions job is running on."""
+    return os.environ.get("GITHUB_REF_NAME", "") or _current_branch()
+
+
+def _clean_git_state() -> None:
+    """Abort any in-progress rebase/merge and get back on the branch."""
     _check(["git", "rebase", "--abort"])
-    if _current_branch() != "HEAD":
-        return
-    branch = os.environ.get("GITHUB_REF_NAME", "")
-    if not branch:
-        r = _run(["git", "branch", "-r", "--list", "origin/*"], capture=True)
-        lines = [l.strip().removeprefix("origin/")
-                 for l in r.stdout.splitlines() if "HEAD" not in l]
-        branch = lines[0] if lines else "main"
-    print(f"[storage] Detached HEAD — checking out {branch}")
-    _check(["git", "checkout", branch])
+    _check(["git", "merge", "--abort"])
+    branch = _target_branch()
+    if _current_branch() == "HEAD":
+        _check(["git", "checkout", branch])
 
 
-def _resolve_jsonl_conflicts() -> bool:
-    """Strip git conflict markers from JSONL files, keeping all data lines from
-    both sides (correct for append-only files).  Returns True if any were resolved."""
-    r = _run(["git", "diff", "--name-only", "--diff-filter=U"], capture=True)
-    conflicted = [p.strip() for p in r.stdout.strip().splitlines() if p.strip()]
-    if not conflicted:
-        return False
-
-    for filepath in conflicted:
-        if not filepath.endswith(".jsonl"):
-            continue
-        path = REPO_ROOT / filepath
-        lines = []
-        for line in path.read_text().splitlines():
-            # Drop conflict markers; keep every actual data line from both sides.
-            if line.startswith(("<<<<<<<", "=======", ">>>>>>>")):
-                continue
-            if line.strip():
-                lines.append(line)
-        path.write_text("\n".join(lines) + "\n")
-        _check(["git", "add", filepath])
-
-    return True
-
-
-def _rebase_onto_remote(branch: str) -> None:
-    """Rebase local commits onto remote/branch, resolving JSONL conflicts
-    by retaining all data lines from both sides."""
-    if _check(["git", "rebase", f"origin/{branch}"]) == 0:
-        return
-
-    # Up to 20 rounds: each round resolves one commit's conflicts and continues.
-    for _ in range(20):
-        if not _resolve_jsonl_conflicts():
-            _check(["git", "rebase", "--abort"])
-            return
-        rc = _check(["git", "-c", "core.editor=true", "rebase", "--continue"])
-        if rc == 0:
-            return  # All commits replayed successfully.
-
-    _check(["git", "rebase", "--abort"])
+def _local_additions(path: Path, remote_ref: str) -> list[str]:
+    """Lines in our local file that the remote doesn't have (our unsynced data)."""
+    rel = str(path.relative_to(REPO_ROOT))
+    r = _run(["git", "show", f"{remote_ref}:{rel}"], capture=True)
+    remote_lines: set[str] = set(r.stdout.splitlines()) if r.returncode == 0 else set()
+    try:
+        return [
+            line.rstrip("\n")
+            for line in path.read_text().splitlines()
+            if line.strip() and line.strip() not in remote_lines
+        ]
+    except FileNotFoundError:
+        return []
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def commit_data(message: str) -> bool:
-    """Stage data/ and commit+push if running inside GitHub Actions.
+    """Sync local data files to remote and push.
 
-    Returns True if a commit was made, False otherwise.
-    All git output is forwarded to stdout so failures are visible in the Actions log.
+    Strategy (no rebase, no conflicts):
+      1. Fetch remote to get its latest state.
+      2. Compute which lines each local JSONL file has that remote doesn't.
+      3. Hard-reset working tree to remote (eliminates any diverged history).
+      4. Re-append our unsynced lines on top of the remote files.
+      5. Commit and push — we're exactly one commit ahead so push always succeeds.
+      6. If push fails (another concurrent commit landed), retry the whole loop.
+
+    Returns True if a commit was pushed, False otherwise.
     """
     if not os.environ.get("GITHUB_ACTIONS"):
         print("[storage] Not in GitHub Actions — skipping git commit.")
         return False
 
-    _recover_detached_head()
-
-    _check(["git", "add", str(DATA_DIR)])
-
-    if not _has_staged_changes():
-        print("[storage] Nothing to commit.")
-        return False
-
-    if _check(["git", "commit", "-m", message]) != 0:
-        print("[storage] Commit failed (see git output above).")
-        return False
-
-    branch = _current_branch()
+    _clean_git_state()
+    branch = _target_branch()
 
     for attempt in range(1, 5):
-        if _check(["git", "push"]) == 0:
-            print(f"[storage] Pushed: {message}")
-            return True
-        print(f"[storage] Push attempt {attempt} failed — syncing with remote…")
+        remote_ref = f"origin/{branch}"
         _check(["git", "fetch", "origin", branch])
-        _rebase_onto_remote(branch)
+
+        # Collect every JSONL file we've been writing to, plus any others under data/.
+        tracked = set(_path_cache.values())
+        all_paths = tracked | set(DATA_DIR.rglob("*.jsonl"))
+
+        additions: dict[Path, list[str]] = {}
+        for path in all_paths:
+            lines = _local_additions(path, remote_ref)
+            if lines:
+                additions[path] = lines
+
+        if not additions:
+            print("[storage] No local data to push.")
+            return False
+
+        # Reset to remote state — no merge conflicts possible after this.
+        _check(["git", "reset", "--hard", remote_ref])
+
+        # Re-apply our unsynced lines on top of the remote files.
+        for path, lines in additions.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a") as fh:
+                for line in lines:
+                    fh.write(line + "\n")
+
+        _check(["git", "add", str(DATA_DIR)])
+        if not _has_staged_changes():
+            print("[storage] Nothing new after sync.")
+            return False
+
+        _check(["git", "commit", "-m", message])
+
+        if _check(["git", "push"]) == 0:
+            print(f"[storage] Pushed ({len(additions)} file(s)): {message}")
+            return True
+
+        print(f"[storage] Push attempt {attempt} failed (concurrent commit) — retrying…")
         time.sleep(2 ** attempt)
 
-    print("[storage] Push failed after retries (see git output above).")
+    print("[storage] Push failed after retries.")
     return False

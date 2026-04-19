@@ -100,7 +100,7 @@ async def _stream_session(
         WS_URL,
         additional_headers=headers,
         ping_interval=30,
-        ping_timeout=15,
+        ping_timeout=60,  # git commit_data can block ~10s; 60s gives ample headroom
         close_timeout=5,
     ) as ws:
         tickers = get_active_tickers()
