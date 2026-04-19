@@ -53,16 +53,24 @@ To reconstruct the full orderbook at any point, start from the most recent snaps
 
 ## Setup
 
-### 1. Add GitHub Secrets
+### 1. Add GitHub Repository Secrets
 
-Go to **Settings → Secrets and variables → Actions** and add:
+Navigate to your repository on GitHub, then go to **Settings → Secrets and variables → Actions → Repository secrets** and click **New repository secret** for each of the following:
 
-| Secret | Value |
-|--------|-------|
+| Secret name | Value |
+|-------------|-------|
 | `KALSHI_API_KEY_ID` | The API Key ID string from Kalshi → Account & Security → API Keys |
 | `KALSHI_PRIVATE_KEY` | The full contents of your downloaded `.pem` private key file |
 
-Paste the entire PEM block including the `-----BEGIN ...-----` header and footer lines. GitHub supports multi-line secret values.
+For `KALSHI_PRIVATE_KEY`, paste the entire PEM block including the header and footer lines:
+```
+-----BEGIN RSA PRIVATE KEY-----
+...
+-----END RSA PRIVATE KEY-----
+```
+GitHub supports multi-line secret values — paste as-is.
+
+> **Repository secrets vs Environment secrets:** use Repository secrets here. Environment secrets are scoped to specific deployment environments (e.g. `production`) and require additional configuration that this workflow does not use.
 
 ### 2. Activate the workflow
 
