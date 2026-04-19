@@ -1,25 +1,30 @@
 name: Stream Kalshi Orderbook
 
 on:
-  # Four non-overlapping 6-hour windows cover the full day.
+  # Fires every hour. Each job runs for 65 minutes, so the next trigger arrives
+  # while the current job is still running — concurrency queuing ensures no gap.
+  # If a job crashes, the next trigger fires within at most 1 hour.
   schedule:
-    - cron: '0 0 * * *'   # 00:00 UTC
-    - cron: '0 6 * * *'   # 06:00 UTC
-    - cron: '0 12 * * *'  # 12:00 UTC
-    - cron: '0 18 * * *'  # 18:00 UTC
+    - cron: '0 * * * *'
   # Manual trigger for testing — set duration via the input below.
   workflow_dispatch:
     inputs:
       duration:
-        description: 'Stream duration in seconds (default: 21000 ≈ 5h 50m)'
+        description: 'Stream duration in seconds (default: 3900 = 65 min)'
         required: false
-        default: '21000'
+        default: '3900'
+
+# Only one streaming job at a time. New triggers queue (not cancel) so there
+# is no gap between runs during normal operation.
+concurrency:
+  group: stream-kalshi-orderbook
+  cancel-in-progress: false
 
 jobs:
   stream:
     runs-on: ubuntu-latest
-    # Hard cap just under GitHub's 6-hour job limit.
-    timeout-minutes: 355
+    # Hard cap at 70 minutes — slightly above the 65-minute stream duration.
+    timeout-minutes: 70
 
     permissions:
       contents: write   # needed to push data commits back to the repo
@@ -57,7 +62,7 @@ jobs:
         env:
           KALSHI_API_KEY_ID: ${{ secrets.KALSHI_API_KEY_ID }}
           KALSHI_PRIVATE_KEY: ${{ secrets.KALSHI_PRIVATE_KEY }}
-          STREAM_DURATION_SECONDS: ${{ github.event.inputs.duration || '21000' }}
+          STREAM_DURATION_SECONDS: ${{ github.event.inputs.duration || '3900' }}
 
       # Flush any data that was written but not yet committed
       # (e.g. markets still open when the duration timer fired).

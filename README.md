@@ -4,15 +4,15 @@ Streams real-time orderbook data for Bitcoin and Ethereum 15-minute binary optio
 
 ## How it works
 
-A GitHub Actions workflow runs four times per day (every 6 hours). Each job:
+A GitHub Actions workflow runs every hour around the clock. Each job:
 
 1. Authenticates with the Kalshi API using RSA-PSS signing
 2. Discovers all currently open `KXBTC15M` and `KXETH15M` markets
-3. Connects to the Kalshi WebSocket and subscribes to live orderbook events
-4. Persists every snapshot and delta as a line in a `.jsonl` file under `data/`
+3. Connects to the Kalshi WebSocket and subscribes to live orderbook, trade, ticker, and lifecycle events
+4. Persists every event as a line in a `.jsonl` file under `data/`
 5. Commits accumulated data back to this repo roughly every minute and on each market settlement
 
-Four non-overlapping 6-hour jobs (00:00, 06:00, 12:00, 18:00 UTC) provide continuous 24-hour coverage. Auto-reconnect with exponential backoff handles dropped connections.
+Each job runs for 65 minutes. GitHub's concurrency queuing ensures the next job starts immediately after the previous one finishes — no gap. If a job crashes, the next trigger fires within at most 1 hour. Auto-reconnect with exponential backoff handles dropped connections within a session.
 
 ## Data format
 
