@@ -27487,3 +27487,7 @@
 {"type": "delta", "ts": 1776562883.867395, "ticker": "KXETH15M-26APR182145-45", "seq": 131670, "side": "yes"}
 {"type": "delta", "ts": 1776562883.8674934, "ticker": "KXETH15M-26APR182145-45", "seq": 131671, "side": "yes"}
 {"type": "delta", "ts": 1776562883.867612, "ticker": "KXETH15M-26APR182145-45", "seq": 131672, "side": "yes"}
+{"type": "delta", "ts": 1776562885.5840216, "ticker": "KXETH15M-26APR182145-45", "seq": 131673, "side": "no"}
+{"type": "delta", "ts": 1776562885.58443, "ticker": "KXETH15M-26APR182145-45", "seq": 131674, "side": "no"}
+{"type": "delta", "ts": 1776562885.5845532, "ticker": "KXETH15M-26APR182145-45", "seq": 131675, "side": "yes"}
+{"type": "delta", "ts": 1776562885.5846956, "ticker": "KXETH15M-26APR182145-45", "seq": 131676, "side": "yes"}
