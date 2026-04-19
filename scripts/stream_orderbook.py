@@ -48,7 +48,8 @@ WS_PATH = "/trade-api/ws/v2"
 STREAM_DURATION  = int(os.environ.get("STREAM_DURATION_SECONDS", "21000"))
 COMMIT_INTERVAL  = 60   # seconds between periodic git commits
 STATS_INTERVAL   = 300  # seconds between REST market-stats snapshots
-DISCOVERY_RETRY_WAIT = 30  # seconds to wait if no open markets found
+DISCOVERY_INTERVAL   = 90   # seconds between periodic market re-discovery
+DISCOVERY_RETRY_WAIT = 30   # seconds to wait if no open markets found initially
 
 
 async def _subscribe(ws, tickers: list[str], msg_id: int) -> int:
@@ -89,6 +90,7 @@ async def _stream_session(
     start_time: float,
     last_commit_ref: list[float],
     last_stats_ref: list[float],
+    last_discovery_ref: list[float],
     msg_id_ref: list[int],
 ) -> None:
     """Open one WebSocket session and process messages until duration or error."""
@@ -226,6 +228,22 @@ async def _stream_session(
                         for t in new_tickers:
                             orderbooks[t] = OrderbookState(t)
 
+            # ── Periodic market re-discovery ─────────────────────────────
+            # Catches new markets whose 'determined' event was missed during
+            # a reconnect — without this, the streamer skips entire markets.
+            if time.monotonic() - last_discovery_ref[0] >= DISCOVERY_INTERVAL:
+                new_tickers = [
+                    t for t in get_active_tickers() if t not in orderbooks
+                ]
+                if new_tickers:
+                    log.info("Re-discovery found %d new ticker(s): %s",
+                             len(new_tickers), new_tickers)
+                    msg_id_ref[0] = await _subscribe(ws, new_tickers, msg_id_ref[0])
+                    _save_metadata(new_tickers)
+                    for t in new_tickers:
+                        orderbooks[t] = OrderbookState(t)
+                last_discovery_ref[0] = time.monotonic()
+
             # ── Periodic REST stats snapshot ──────────────────────────────
             if time.monotonic() - last_stats_ref[0] >= STATS_INTERVAL:
                 active = list(orderbooks.keys())
@@ -245,15 +263,18 @@ async def _stream_session(
 async def run() -> None:
     start_time = time.monotonic()
     orderbooks: dict[str, OrderbookState] = {}
-    last_commit_ref = [time.monotonic()]
-    last_stats_ref  = [time.monotonic()]
+    last_commit_ref    = [time.monotonic()]
+    last_stats_ref     = [time.monotonic()]
+    last_discovery_ref = [0.0]  # 0 forces re-discovery immediately on first loop
     msg_id_ref = [0]
     backoff = 2.0
 
     while time.monotonic() - start_time < STREAM_DURATION:
         try:
             await _stream_session(
-                orderbooks, start_time, last_commit_ref, last_stats_ref, msg_id_ref
+                orderbooks, start_time,
+                last_commit_ref, last_stats_ref, last_discovery_ref,
+                msg_id_ref,
             )
             backoff = 2.0  # reset after a clean session
         except websockets.exceptions.ConnectionClosed as exc:
