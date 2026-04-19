@@ -8,10 +8,9 @@ A GitHub Actions workflow runs four times per day (every 6 hours). Each job:
 
 1. Authenticates with the Kalshi API using RSA-PSS signing
 2. Discovers all currently open `KXBTC15M` and `KXETH15M` markets
-3. Connects to the Kalshi WebSocket and subscribes to `orderbook_delta` events
-4. Applies every snapshot and delta to maintain a live orderbook in memory
-5. Persists each event as a line in a `.jsonl` file under `data/`
-6. Commits accumulated data back to this repo on each market close (~every 15 min) and at job end
+3. Connects to the Kalshi WebSocket and subscribes to live orderbook events
+4. Persists every snapshot and delta as a line in a `.jsonl` file under `data/`
+5. Commits accumulated data back to this repo roughly every minute and on each market settlement
 
 Four non-overlapping 6-hour jobs (00:00, 06:00, 12:00, 18:00 UTC) provide continuous 24-hour coverage. Auto-reconnect with exponential backoff handles dropped connections.
 
@@ -28,28 +27,77 @@ data/
       KXETH15M-26APR191500.jsonl
 ```
 
-One file per 15-minute market instance. Each line is a JSON event:
+One file per 15-minute market instance. Each line is a JSON event.
 
-**Snapshot** (emitted on subscription and after reconnect):
+**Snapshot** — full orderbook state, emitted on subscription and after reconnect:
 ```json
-{"type":"snapshot","ts":1745078400.123,"ticker":"KXBTC15M-26APR191500","seq":1,"yes":[[65,10],[64,25]],"no":[[36,8],[35,20]]}
+{"type":"snapshot","ts":1745078400.123,"ticker":"KXBTC15M-26APR191500","seq":1,
+ "yes":[["0.5500","150.00"],["0.5400","320.00"]],
+ "no": [["0.4600","200.00"],["0.4500","180.00"]]}
 ```
 
-**Delta** (emitted on every orderbook change):
+**Delta** — single price-level change, emitted on every orderbook update:
 ```json
-{"type":"delta","ts":1745078401.456,"ticker":"KXBTC15M-26APR191500","seq":2,"side":"yes","price":65,"delta":-5}
+{"type":"delta","ts":1745078401.456,"ticker":"KXBTC15M-26APR191500","seq":2,
+ "side":"yes","price":"0.5500","delta":"-50.00"}
 ```
 
 | Field | Description |
 |-------|-------------|
 | `ts` | Unix timestamp (UTC) |
-| `seq` | Kalshi sequence number — gaps indicate a missed event; re-snapshot on reconnect |
-| `yes` / `no` | Price levels sorted best-bid first: `[[price_cents, contracts], ...]` |
+| `seq` | Sequence number — gaps mean a missed event; the streamer re-subscribes to get a fresh snapshot on reconnect |
+| `yes` / `no` | Price levels sorted best-bid first: `[[price, size], ...]` |
+| `price` | Dollar price per contract (e.g. `"0.5500"` = $0.55) |
+| `size` / `delta` | Dollar value in dollars (e.g. `"150.00"` = $150) |
 | `side` | `"yes"` or `"no"` |
-| `price` | Price level in cents (0–99) |
-| `delta` | Change in contract quantity (positive = more, negative = fewer) |
 
-To reconstruct the full orderbook at any point, start from the most recent snapshot and apply all subsequent deltas in sequence order.
+### Liquidity
+
+All liquidity data is captured. Each price level's size value is the dollar amount available to trade at that price. From any reconstructed state you can derive:
+
+- **Depth at any price** — the size at each level
+- **Total liquidity** — sum of all size values across all levels
+- **Best bid/ask spread** — `1.0 - best_yes_price - best_no_price`
+- **Market depth within a range** — sum sizes between two price thresholds
+
+### Reconstructing the full orderbook
+
+The JSONL files store snapshots + deltas rather than a redundant full-state copy on every tick (~30–100× more compact). Use `reconstruct.py` to get the complete orderbook at any moment:
+
+```bash
+# Latest state
+python scripts/reconstruct.py KXBTC15M-26APR191500
+
+# State as of a specific time
+python scripts/reconstruct.py KXBTC15M-26APR191500 --at 2026-04-19T01:10:00
+
+# Show all price levels
+python scripts/reconstruct.py KXBTC15M-26APR191500 --levels 200
+
+# JSON output for use in other scripts
+python scripts/reconstruct.py KXBTC15M-26APR191500 --json
+
+# List all tickers with saved data
+python scripts/reconstruct.py --list
+```
+
+Or use it as a library:
+
+```python
+from scripts.reconstruct import reconstruct
+
+state = reconstruct("KXBTC15M-26APR191500")
+
+total_yes_liq = sum(float(s) for _, s in state["yes"])
+total_no_liq  = sum(float(s) for _, s in state["no"])
+best_yes      = float(state["yes"][0][0]) if state["yes"] else 0
+best_no       = float(state["no"][0][0])  if state["no"]  else 0
+spread        = 1.0 - best_yes - best_no
+
+print(f"YES liquidity: ${total_yes_liq:,.2f}")
+print(f"NO liquidity:  ${total_no_liq:,.2f}")
+print(f"Spread:        ${spread:.4f}")
+```
 
 ## Setup
 
@@ -87,11 +135,14 @@ export KALSHI_PRIVATE_KEY="$(cat /path/to/your/private_key.pem)"
 # Smoke-test auth
 python scripts/kalshi_auth.py
 
-# List currently open markets
-python scripts/market_discovery.py
+# Verify connection and check active markets
+python scripts/diagnose.py
 
 # Run a short 60-second stream (writes to data/ locally, skips git commit)
 STREAM_DURATION_SECONDS=60 python scripts/stream_orderbook.py
+
+# Reconstruct the orderbook from saved data
+python scripts/reconstruct.py --list
 ```
 
 Copy `.env.example` to `.env` and fill in your values if you prefer loading from a file. The streamer skips git commits when `GITHUB_ACTIONS` is not set, so local runs are safe.
@@ -105,6 +156,8 @@ Copy `.env.example` to `.env` and fill in your values if you prefer loading from
 | `scripts/orderbook_state.py` | In-memory orderbook; applies snapshots and deltas |
 | `scripts/github_storage.py` | Appends JSONL records and git-commits from within Actions |
 | `scripts/stream_orderbook.py` | Main entry point — async WebSocket loop with auto-reconnect |
+| `scripts/diagnose.py` | Checks auth, REST connectivity, and WebSocket before streaming |
+| `scripts/reconstruct.py` | Replays JSONL data to return the full orderbook at any timestamp |
 
 ## Security
 
