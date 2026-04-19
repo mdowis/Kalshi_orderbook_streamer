@@ -70,6 +70,20 @@ One file per 15-minute market instance. Each line is a JSON event in chronologic
  "dollar_volume":737.0,"open_interest":342,"yes_bid":"0.54","yes_ask":"0.56"}
 ```
 
+**lifecycle** — market state transition (open → paused → determined → settled):
+```json
+{"type":"lifecycle","ts":1745079000.123,"ticker":"KXBTC15M-26APR191500",
+ "event_type":"determined"}
+```
+
+**meta** (second occurrence at settlement) — final REST fetch capturing resolution:
+```json
+{"type":"meta","ts":1745079000.500,"ticker":"KXBTC15M-26APR191500",
+ "result":"yes","floor_strike":94000,"cap_strike":95000,"status":"finalized"}
+```
+
+The `result` field is `"yes"` if BTC/ETH closed within the strike range, `"no"` otherwise.
+
 | Field | Description |
 |-------|-------------|
 | `ts` | Unix timestamp (UTC) |

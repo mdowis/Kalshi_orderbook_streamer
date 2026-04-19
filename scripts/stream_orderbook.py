@@ -190,10 +190,30 @@ async def _stream_session(
                     continue  # platform-wide broadcast — ignore other markets
                 log.info("Market lifecycle %s event_type=%s", ticker, event_type)
 
+                # Save every lifecycle event (open, paused, determined, etc.)
+                lifecycle_record: dict = {
+                    "type":       "lifecycle",
+                    "ts":         now,
+                    "ticker":     ticker,
+                    "seq":        seq,
+                    "event_type": event_type,
+                }
+                for key, val in data.items():
+                    if key not in ("market_ticker", "event_type"):
+                        lifecycle_record[key] = val
+                append_record(ticker, lifecycle_record, now)
+
                 if event_type == "determined":
+                    # Fetch final market state from REST to capture result + settlement price.
+                    final_meta = get_market_metadata(ticker)
+                    final_meta["ts"] = now
+                    append_record(ticker, final_meta, now)
+                    log.info("Settlement %s result=%s", ticker, final_meta.get("result"))
+
                     dt = datetime.fromtimestamp(now, tz=timezone.utc)
+                    result = final_meta.get("result", "?")
                     commit_data(
-                        f"data: {ticker} settled {dt.strftime('%Y-%m-%d %H:%M')} UTC"
+                        f"data: {ticker} settled={result} {dt.strftime('%Y-%m-%d %H:%M')} UTC"
                     )
                     last_commit_ref[0] = time.monotonic()
 
