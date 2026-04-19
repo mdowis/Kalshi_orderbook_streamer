@@ -12212,3 +12212,13 @@
 {"type": "delta", "ts": 1776562589.0888577, "ticker": "KXETH15M-26APR182145-45", "seq": 78983, "side": "no"}
 {"type": "delta", "ts": 1776562589.088965, "ticker": "KXETH15M-26APR182145-45", "seq": 78984, "side": "yes"}
 {"type": "delta", "ts": 1776562589.0890834, "ticker": "KXETH15M-26APR182145-45", "seq": 78985, "side": "yes"}
+{"type": "delta", "ts": 1776562591.344831, "ticker": "KXETH15M-26APR182145-45", "seq": 79013, "side": "yes"}
+{"type": "delta", "ts": 1776562591.3449693, "ticker": "KXETH15M-26APR182145-45", "seq": 79014, "side": "yes"}
+{"type": "delta", "ts": 1776562591.3454149, "ticker": "KXETH15M-26APR182145-45", "seq": 79018, "side": "yes"}
+{"type": "delta", "ts": 1776562591.3455222, "ticker": "KXETH15M-26APR182145-45", "seq": 79019, "side": "yes"}
+{"type": "delta", "ts": 1776562591.3457823, "ticker": "KXETH15M-26APR182145-45", "seq": 79021, "side": "yes"}
+{"type": "delta", "ts": 1776562591.3458858, "ticker": "KXETH15M-26APR182145-45", "seq": 79022, "side": "yes"}
+{"type": "delta", "ts": 1776562591.3459885, "ticker": "KXETH15M-26APR182145-45", "seq": 79023, "side": "no"}
+{"type": "delta", "ts": 1776562591.346091, "ticker": "KXETH15M-26APR182145-45", "seq": 79024, "side": "no"}
+{"type": "delta", "ts": 1776562591.3461926, "ticker": "KXETH15M-26APR182145-45", "seq": 79025, "side": "yes"}
+{"type": "delta", "ts": 1776562591.346293, "ticker": "KXETH15M-26APR182145-45", "seq": 79026, "side": "yes"}
