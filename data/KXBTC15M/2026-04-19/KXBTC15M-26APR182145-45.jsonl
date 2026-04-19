@@ -73376,3 +73376,4 @@
 {"type": "delta", "ts": 1776562931.8407242, "ticker": "KXBTC15M-26APR182145-45", "seq": 136770, "side": "yes"}
 {"type": "delta", "ts": 1776562931.8408778, "ticker": "KXBTC15M-26APR182145-45", "seq": 136771, "side": "no"}
 {"type": "delta", "ts": 1776562931.8412097, "ticker": "KXBTC15M-26APR182145-45", "seq": 136773, "side": "no"}
+{"type": "delta", "ts": 1776562933.8631225, "ticker": "KXBTC15M-26APR182145-45", "seq": 136774, "side": "no"}
