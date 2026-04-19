@@ -3,6 +3,9 @@
 As of March 2026 Kalshi uses fixed-point dollar strings for prices and sizes.
 Snapshots arrive as type "orderbook_snapshot"; deltas as "orderbook_delta".
 The seq number lives at the envelope level, not inside msg.
+
+Delta msg format observed: {"market_ticker": "...", "side": "yes|no",
+  "yes_dollars_fp": [[price_str, size_str], ...]}  — partial level updates.
 """
 
 from __future__ import annotations
@@ -29,22 +32,40 @@ class OrderbookState:
         self.no  = {p: s for p, s in msg.get("no_dollars_fp",  [])}
 
     def apply_delta(self, seq: int, msg: dict) -> None:
-        """Apply a single price-level delta.
+        """Apply a delta message to the live orderbook.
 
-        Expects msg to contain: side, price (dollar string), delta (dollar string).
-        A level whose new size reaches 0 or below is removed.
+        Handles two observed Kalshi formats:
+          1. yes_dollars_fp / no_dollars_fp — partial level list; size "0.00"
+             means remove that level.
+          2. price + delta fields — single-level additive change.
         """
         self.seq = seq
+
+        # Format 1: bulk partial-level updates (observed in production)
+        if "yes_dollars_fp" in msg or "no_dollars_fp" in msg:
+            for p, s in msg.get("yes_dollars_fp", []):
+                if float(s) <= 0:
+                    self.yes.pop(p, None)
+                else:
+                    self.yes[p] = s
+            for p, s in msg.get("no_dollars_fp", []):
+                if float(s) <= 0:
+                    self.no.pop(p, None)
+                else:
+                    self.no[p] = s
+            return
+
+        # Format 2: single price+delta (additive)
         side  = msg.get("side", "")
         price = msg.get("price", "")
         delta = float(msg.get("delta", 0))
-
-        levels = self.yes if side == "yes" else self.no
-        new_size = float(levels.get(price, "0")) + delta
-        if new_size <= 0:
-            levels.pop(price, None)
-        else:
-            levels[price] = f"{new_size:.2f}"
+        if price:
+            levels = self.yes if side == "yes" else self.no
+            new_size = float(levels.get(price, "0")) + delta
+            if new_size <= 0:
+                levels.pop(price, None)
+            else:
+                levels[price] = f"{new_size:.2f}"
 
     # ------------------------------------------------------------------
     # Serialisation helpers
@@ -80,8 +101,8 @@ class OrderbookState:
             "ticker": ticker,
             "seq":    seq,
         }
-        # Forward delta fields (side, price, delta) as-is.
-        for key in ("side", "price", "delta"):
-            if key in msg:
-                record[key] = msg[key]
+        # Save every field Kalshi sends (market_ticker is redundant with ticker).
+        for key, val in msg.items():
+            if key != "market_ticker":
+                record[key] = val
         return record

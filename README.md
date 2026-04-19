@@ -27,19 +27,47 @@ data/
       KXETH15M-26APR191500.jsonl
 ```
 
-One file per 15-minute market instance. Each line is a JSON event.
+One file per 15-minute market instance. Each line is a JSON event in chronological order. Six record types are stored:
 
-**Snapshot** — full orderbook state, emitted on subscription and after reconnect:
+**meta** — market metadata, written once at subscription time:
+```json
+{"type":"meta","ticker":"KXBTC15M-26APR191500",
+ "floor_strike":94000,"cap_strike":95000,"strike_type":"greater_or_equal",
+ "open_time":"2026-04-19T14:45:00Z","close_time":"2026-04-19T15:00:00Z",
+ "yes_sub_title":"≥ $94,000","no_sub_title":"< $94,000","status":"open"}
+```
+
+**snapshot** — full orderbook state, emitted on subscription and after reconnect:
 ```json
 {"type":"snapshot","ts":1745078400.123,"ticker":"KXBTC15M-26APR191500","seq":1,
  "yes":[["0.5500","150.00"],["0.5400","320.00"]],
  "no": [["0.4600","200.00"],["0.4500","180.00"]]}
 ```
 
-**Delta** — single price-level change, emitted on every orderbook update:
+**delta** — incremental orderbook change, emitted on every price-level update:
 ```json
 {"type":"delta","ts":1745078401.456,"ticker":"KXBTC15M-26APR191500","seq":2,
- "side":"yes","price":"0.5500","delta":"-50.00"}
+ "side":"yes","yes_dollars_fp":[["0.5500","200.00"]]}
+```
+
+**trade** — executed trade (matched order):
+```json
+{"type":"trade","ts":1745078402.789,"ticker":"KXBTC15M-26APR191500","seq":3,
+ "side":"yes","price":"0.5500","count":10,"taker_side":"yes"}
+```
+
+**ticker** — real-time market statistics update:
+```json
+{"type":"ticker","ts":1745078403.001,"ticker":"KXBTC15M-26APR191500",
+ "yes_bid":"0.5400","yes_ask":"0.5600","last_price":"0.5500",
+ "volume":1250,"open_interest":340}
+```
+
+**stats** — REST-polled market stats snapshot (every 5 minutes):
+```json
+{"type":"stats","ts":1745078700.000,"ticker":"KXBTC15M-26APR191500",
+ "last_price":"0.5500","volume":1340,"volume_24h":28400,
+ "dollar_volume":737.0,"open_interest":342,"yes_bid":"0.54","yes_ask":"0.56"}
 ```
 
 | Field | Description |
@@ -47,9 +75,14 @@ One file per 15-minute market instance. Each line is a JSON event.
 | `ts` | Unix timestamp (UTC) |
 | `seq` | Sequence number — gaps mean a missed event; the streamer re-subscribes to get a fresh snapshot on reconnect |
 | `yes` / `no` | Price levels sorted best-bid first: `[[price, size], ...]` |
+| `yes_dollars_fp` / `no_dollars_fp` | Partial level updates in a delta (only changed levels) |
 | `price` | Dollar price per contract (e.g. `"0.5500"` = $0.55) |
-| `size` / `delta` | Dollar value in dollars (e.g. `"150.00"` = $150) |
+| `size` | Dollar value of resting liquidity (e.g. `"150.00"` = $150) |
 | `side` | `"yes"` or `"no"` |
+| `count` | Number of contracts in a trade |
+| `floor_strike` / `cap_strike` | BTC/ETH price range that resolves YES |
+| `volume` / `volume_24h` | Contracts traded (total / last 24 h) |
+| `open_interest` | Contracts currently outstanding |
 
 ### Liquidity
 
@@ -152,10 +185,10 @@ Copy `.env.example` to `.env` and fill in your values if you prefer loading from
 | Script | Purpose |
 |--------|---------|
 | `scripts/kalshi_auth.py` | Generates RSA-PSS signed headers for Kalshi requests |
-| `scripts/market_discovery.py` | Fetches open KXBTC15M / KXETH15M tickers from the REST API |
+| `scripts/market_discovery.py` | Fetches open KXBTC15M / KXETH15M tickers, market metadata, and REST stats |
 | `scripts/orderbook_state.py` | In-memory orderbook; applies snapshots and deltas |
 | `scripts/github_storage.py` | Appends JSONL records and git-commits from within Actions |
-| `scripts/stream_orderbook.py` | Main entry point — async WebSocket loop with auto-reconnect |
+| `scripts/stream_orderbook.py` | Main entry point — streams orderbook, trades, ticker updates, and stats |
 | `scripts/diagnose.py` | Checks auth, REST connectivity, and WebSocket before streaming |
 | `scripts/reconstruct.py` | Replays JSONL data to return the full orderbook at any timestamp |
 
