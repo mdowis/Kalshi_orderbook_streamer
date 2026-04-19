@@ -57,6 +57,8 @@ def append_record(ticker: str, record: dict, ts: float | None = None) -> None:
         fh.write(json.dumps(record) + "\n")
 
 
+# ── Git helpers ───────────────────────────────────────────────────────────────
+
 def _run(cmd: list[str], capture: bool = False) -> subprocess.CompletedProcess:
     return subprocess.run(
         cmd, cwd=str(REPO_ROOT),
@@ -65,7 +67,6 @@ def _run(cmd: list[str], capture: bool = False) -> subprocess.CompletedProcess:
 
 
 def _check(cmd: list[str]) -> int:
-    """Run a command and return its exit code; output flows to the Actions log."""
     return _run(cmd).returncode
 
 
@@ -80,29 +81,64 @@ def _current_branch() -> str:
 
 def _recover_detached_head() -> None:
     """If a prior failed rebase left us in detached HEAD, get back on the branch."""
+    # Always abort any in-progress rebase first so git is in a clean state.
+    _check(["git", "rebase", "--abort"])
     if _current_branch() != "HEAD":
         return
-    # Abort any in-progress rebase first.
-    _check(["git", "rebase", "--abort"])
     branch = os.environ.get("GITHUB_REF_NAME", "")
     if not branch:
-        # Fall back to reading the branch from remote tracking info.
         r = _run(["git", "branch", "-r", "--list", "origin/*"], capture=True)
         lines = [l.strip().removeprefix("origin/")
-                 for l in r.stdout.splitlines()
-                 if "HEAD" not in l]
+                 for l in r.stdout.splitlines() if "HEAD" not in l]
         branch = lines[0] if lines else "main"
-    print(f"[storage] Detached HEAD detected — checking out {branch}")
+    print(f"[storage] Detached HEAD — checking out {branch}")
     _check(["git", "checkout", branch])
 
 
-def _pull_with_union(branch: str) -> int:
-    """Pull and rebase using the union strategy so JSONL add/add conflicts
-    are resolved by keeping all lines from both sides."""
-    return _check([
-        "git", "pull", "--rebase", "-X", "union", "origin", branch,
-    ])
+def _resolve_jsonl_conflicts() -> bool:
+    """Strip git conflict markers from JSONL files, keeping all data lines from
+    both sides (correct for append-only files).  Returns True if any were resolved."""
+    r = _run(["git", "diff", "--name-only", "--diff-filter=U"], capture=True)
+    conflicted = [p.strip() for p in r.stdout.strip().splitlines() if p.strip()]
+    if not conflicted:
+        return False
 
+    for filepath in conflicted:
+        if not filepath.endswith(".jsonl"):
+            continue
+        path = REPO_ROOT / filepath
+        lines = []
+        for line in path.read_text().splitlines():
+            # Drop conflict markers; keep every actual data line from both sides.
+            if line.startswith(("<<<<<<<", "=======", ">>>>>>>")):
+                continue
+            if line.strip():
+                lines.append(line)
+        path.write_text("\n".join(lines) + "\n")
+        _check(["git", "add", filepath])
+
+    return True
+
+
+def _rebase_onto_remote(branch: str) -> None:
+    """Rebase local commits onto remote/branch, resolving JSONL conflicts
+    by retaining all data lines from both sides."""
+    if _check(["git", "rebase", f"origin/{branch}"]) == 0:
+        return
+
+    # Up to 20 rounds: each round resolves one commit's conflicts and continues.
+    for _ in range(20):
+        if not _resolve_jsonl_conflicts():
+            _check(["git", "rebase", "--abort"])
+            return
+        rc = _check(["git", "-c", "core.editor=true", "rebase", "--continue"])
+        if rc == 0:
+            return  # All commits replayed successfully.
+
+    _check(["git", "rebase", "--abort"])
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
 
 def commit_data(message: str) -> bool:
     """Stage data/ and commit+push if running inside GitHub Actions.
@@ -132,11 +168,9 @@ def commit_data(message: str) -> bool:
         if _check(["git", "push"]) == 0:
             print(f"[storage] Pushed: {message}")
             return True
-        print(f"[storage] Push attempt {attempt} failed — pulling with union strategy…")
-        rc = _pull_with_union(branch)
-        if rc != 0:
-            # Union rebase still failed; abort cleanly before next attempt.
-            _check(["git", "rebase", "--abort"])
+        print(f"[storage] Push attempt {attempt} failed — syncing with remote…")
+        _check(["git", "fetch", "origin", branch])
+        _rebase_onto_remote(branch)
         time.sleep(2 ** attempt)
 
     print("[storage] Push failed after retries (see git output above).")
