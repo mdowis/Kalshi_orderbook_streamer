@@ -28057,3 +28057,4 @@
 {"type": "snapshot", "ts": 1776626125.6924686, "ticker": "KXETH15M-26APR191515-15", "seq": 203832, "yes": [], "no": []}
 {"type": "lifecycle", "ts": 1776626125.693446, "ticker": "KXETH15M-26APR191515-15", "seq": 3148, "event_type": "settled", "settled_ts": 1776626114}
 {"type": "stats", "ts": 1776626166.102926, "ticker": "KXETH15M-26APR191515-15", "last_price": null, "previous_price": null, "volume": null, "volume_24h": null, "dollar_volume": null, "dollar_volume_24h": null, "open_interest": null, "liquidity": null, "yes_bid": null, "yes_ask": null, "no_bid": null, "no_ask": null}
+{"type": "stats", "ts": 1776626468.3923974, "ticker": "KXETH15M-26APR191515-15", "last_price": null, "previous_price": null, "volume": null, "volume_24h": null, "dollar_volume": null, "dollar_volume_24h": null, "open_interest": null, "liquidity": null, "yes_bid": null, "yes_ask": null, "no_bid": null, "no_ask": null}
