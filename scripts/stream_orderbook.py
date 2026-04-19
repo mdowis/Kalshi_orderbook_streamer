@@ -106,40 +106,38 @@ async def _stream_session(
                 raw_logged += 1
 
             msg_type: str = envelope.get("type", "")
-            data: dict = envelope.get("msg", {})
-            ticker: str = data.get("market_ticker", "")
+            seq: int      = envelope.get("seq", 0)
+            data: dict    = envelope.get("msg", {})
+            ticker: str   = data.get("market_ticker", "")
 
-            # ── Orderbook events ──────────────────────────────────────────
-            if msg_type == "orderbook_delta" and ticker:
+            # ── Initial orderbook snapshot ────────────────────────────────
+            if msg_type == "orderbook_snapshot" and ticker:
                 ob = orderbooks.setdefault(ticker, OrderbookState(ticker))
-                sub_type: str = data.get("type", "")
+                ob.apply_snapshot(seq, data)
+                record = ob.to_snapshot_record(now)
+                append_record(ticker, record, now)
+                log.info("Snapshot %s seq=%d yes_levels=%d no_levels=%d",
+                         ticker, seq, len(ob.yes), len(ob.no))
 
-                if sub_type == "snapshot":
-                    ob.apply_snapshot(data)
-                    record = ob.to_snapshot_record(now)
-                    append_record(ticker, record, now)
-                    log.info("Snapshot %s seq=%d yes_levels=%d no_levels=%d",
-                             ticker, ob.seq, len(ob.yes), len(ob.no))
-
-                elif sub_type == "delta":
-                    ob.apply_delta(data)
-                    record = OrderbookState.to_delta_record(ticker, data, now)
-                    append_record(ticker, record, now)
+            # ── Incremental orderbook delta ───────────────────────────────
+            elif msg_type == "orderbook_delta" and ticker:
+                ob = orderbooks.setdefault(ticker, OrderbookState(ticker))
+                ob.apply_delta(seq, data)
+                record = OrderbookState.to_delta_record(ticker, seq, data, now)
+                append_record(ticker, record, now)
 
             # ── Market lifecycle events ───────────────────────────────────
             elif msg_type == "market_lifecycle_v2" and ticker:
-                # Log full data dict to see which field carries the status.
-                log.info("Market lifecycle %s data=%s", ticker, json.dumps(data)[:200])
+                event_type: str = data.get("event_type", "")
+                log.info("Market lifecycle %s event_type=%s", ticker, event_type)
 
-                status: str = data.get("status", data.get("market_status", ""))
-                if status in ("closed", "settled"):
+                if event_type == "determined":
                     dt = datetime.fromtimestamp(now, tz=timezone.utc)
                     commit_data(
-                        f"data: {ticker} {status} {dt.strftime('%Y-%m-%d %H:%M')} UTC"
+                        f"data: {ticker} settled {dt.strftime('%Y-%m-%d %H:%M')} UTC"
                     )
                     last_commit_ref[0] = time.monotonic()
 
-                    # Subscribe to any newly opened markets.
                     new_tickers = [
                         t for t in get_active_tickers() if t not in orderbooks
                     ]
