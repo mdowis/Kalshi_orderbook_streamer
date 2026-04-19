@@ -24,14 +24,27 @@ _path_cache: dict[str, Path] = {}
 
 
 def _data_path(ticker: str, ts: float) -> Path:
-    """Return (and create) the JSONL file path for a given ticker and timestamp."""
+    """Return (and create) the JSONL file path for a given ticker and timestamp.
+
+    If a file for this ticker already exists on disk (e.g. from a previous
+    process run that started before midnight), reuse that path so the market's
+    data stays in one file and git doesn't detect a rename.
+    """
     if ticker in _path_cache:
         return _path_cache[ticker]
-    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+
     series = ticker.split("-")[0]  # e.g. "KXBTC15M"
-    dir_path = DATA_DIR / series / dt.strftime("%Y-%m-%d")
-    dir_path.mkdir(parents=True, exist_ok=True)
-    path = dir_path / f"{ticker}.jsonl"
+
+    # Prefer an existing file over creating a new dated one.
+    existing = sorted((DATA_DIR / series).rglob(f"{ticker}.jsonl"))
+    if existing:
+        path = existing[0]
+    else:
+        dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+        dir_path = DATA_DIR / series / dt.strftime("%Y-%m-%d")
+        dir_path.mkdir(parents=True, exist_ok=True)
+        path = dir_path / f"{ticker}.jsonl"
+
     _path_cache[ticker] = path
     return path
 
