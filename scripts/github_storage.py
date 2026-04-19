@@ -57,19 +57,51 @@ def append_record(ticker: str, record: dict, ts: float | None = None) -> None:
         fh.write(json.dumps(record) + "\n")
 
 
+def _run(cmd: list[str], capture: bool = False) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        cmd, cwd=str(REPO_ROOT),
+        capture_output=capture, text=capture,
+    )
+
+
 def _check(cmd: list[str]) -> int:
     """Run a command and return its exit code; output flows to the Actions log."""
-    result = subprocess.run(cmd, cwd=str(REPO_ROOT))
-    return result.returncode
+    return _run(cmd).returncode
 
 
 def _has_staged_changes() -> bool:
-    """Return True if there are staged changes ready to commit."""
-    result = subprocess.run(
-        ["git", "diff", "--cached", "--quiet"],
-        cwd=str(REPO_ROOT),
-    )
-    return result.returncode != 0  # non-zero means there ARE changes
+    return _run(["git", "diff", "--cached", "--quiet"]).returncode != 0
+
+
+def _current_branch() -> str:
+    r = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture=True)
+    return r.stdout.strip()
+
+
+def _recover_detached_head() -> None:
+    """If a prior failed rebase left us in detached HEAD, get back on the branch."""
+    if _current_branch() != "HEAD":
+        return
+    # Abort any in-progress rebase first.
+    _check(["git", "rebase", "--abort"])
+    branch = os.environ.get("GITHUB_REF_NAME", "")
+    if not branch:
+        # Fall back to reading the branch from remote tracking info.
+        r = _run(["git", "branch", "-r", "--list", "origin/*"], capture=True)
+        lines = [l.strip().removeprefix("origin/")
+                 for l in r.stdout.splitlines()
+                 if "HEAD" not in l]
+        branch = lines[0] if lines else "main"
+    print(f"[storage] Detached HEAD detected — checking out {branch}")
+    _check(["git", "checkout", branch])
+
+
+def _pull_with_union(branch: str) -> int:
+    """Pull and rebase using the union strategy so JSONL add/add conflicts
+    are resolved by keeping all lines from both sides."""
+    return _check([
+        "git", "pull", "--rebase", "-X", "union", "origin", branch,
+    ])
 
 
 def commit_data(message: str) -> bool:
@@ -82,6 +114,8 @@ def commit_data(message: str) -> bool:
         print("[storage] Not in GitHub Actions — skipping git commit.")
         return False
 
+    _recover_detached_head()
+
     _check(["git", "add", str(DATA_DIR)])
 
     if not _has_staged_changes():
@@ -92,13 +126,17 @@ def commit_data(message: str) -> bool:
         print("[storage] Commit failed (see git output above).")
         return False
 
-    # Push with up to 3 retries; pull --rebase on conflict.
-    for attempt in range(1, 4):
+    branch = _current_branch()
+
+    for attempt in range(1, 5):
         if _check(["git", "push"]) == 0:
             print(f"[storage] Pushed: {message}")
             return True
-        print(f"[storage] Push attempt {attempt} failed, rebasing…")
-        _check(["git", "pull", "--rebase"])
+        print(f"[storage] Push attempt {attempt} failed — pulling with union strategy…")
+        rc = _pull_with_union(branch)
+        if rc != 0:
+            # Union rebase still failed; abort cleanly before next attempt.
+            _check(["git", "rebase", "--abort"])
         time.sleep(2 ** attempt)
 
     print("[storage] Push failed after retries (see git output above).")
