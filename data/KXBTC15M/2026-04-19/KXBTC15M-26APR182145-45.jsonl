@@ -73914,3 +73914,10 @@
 {"type": "delta", "ts": 1776562953.0033336, "ticker": "KXBTC15M-26APR182145-45", "seq": 137541, "side": "yes"}
 {"type": "delta", "ts": 1776562953.0034318, "ticker": "KXBTC15M-26APR182145-45", "seq": 137542, "side": "yes"}
 {"type": "delta", "ts": 1776562953.0037572, "ticker": "KXBTC15M-26APR182145-45", "seq": 137545, "side": "yes"}
+{"type": "delta", "ts": 1776562954.7427175, "ticker": "KXBTC15M-26APR182145-45", "seq": 137546, "side": "no"}
+{"type": "delta", "ts": 1776562954.743147, "ticker": "KXBTC15M-26APR182145-45", "seq": 137547, "side": "no"}
+{"type": "delta", "ts": 1776562954.7432673, "ticker": "KXBTC15M-26APR182145-45", "seq": 137548, "side": "no"}
+{"type": "delta", "ts": 1776562954.7433794, "ticker": "KXBTC15M-26APR182145-45", "seq": 137549, "side": "no"}
+{"type": "delta", "ts": 1776562954.7434864, "ticker": "KXBTC15M-26APR182145-45", "seq": 137550, "side": "no"}
+{"type": "delta", "ts": 1776562954.7436278, "ticker": "KXBTC15M-26APR182145-45", "seq": 137551, "side": "yes"}
+{"type": "delta", "ts": 1776562954.7437444, "ticker": "KXBTC15M-26APR182145-45", "seq": 137552, "side": "yes"}
