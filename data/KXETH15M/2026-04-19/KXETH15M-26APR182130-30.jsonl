@@ -10186,3 +10186,4 @@
 {"type": "delta", "ts": 1776562199.9579666, "ticker": "KXETH15M-26APR182130-30", "seq": 34447, "side": "no"}
 {"type": "delta", "ts": 1776562200.0890756, "ticker": "KXETH15M-26APR182130-30", "seq": 34450, "side": "no"}
 {"type": "delta", "ts": 1776562200.168765, "ticker": "KXETH15M-26APR182130-30", "seq": 34453, "side": "no"}
+{"type": "snapshot", "ts": 1776562208.1850135, "ticker": "KXETH15M-26APR182130-30", "seq": 34460, "yes": [], "no": []}
