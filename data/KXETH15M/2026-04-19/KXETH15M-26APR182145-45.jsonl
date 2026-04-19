@@ -4215,3 +4215,15 @@
 {"type": "delta", "ts": 1776562371.4834943, "ticker": "KXETH15M-26APR182145-45", "seq": 49077, "side": "no"}
 {"type": "delta", "ts": 1776562371.4836383, "ticker": "KXETH15M-26APR182145-45", "seq": 49078, "side": "yes"}
 {"type": "delta", "ts": 1776562371.4845836, "ticker": "KXETH15M-26APR182145-45", "seq": 49079, "side": "no"}
+{"type": "delta", "ts": 1776562372.5850546, "ticker": "KXETH15M-26APR182145-45", "seq": 49085, "side": "yes"}
+{"type": "delta", "ts": 1776562372.5851634, "ticker": "KXETH15M-26APR182145-45", "seq": 49086, "side": "yes"}
+{"type": "delta", "ts": 1776562372.585301, "ticker": "KXETH15M-26APR182145-45", "seq": 49087, "side": "no"}
+{"type": "delta", "ts": 1776562372.5854216, "ticker": "KXETH15M-26APR182145-45", "seq": 49088, "side": "no"}
+{"type": "delta", "ts": 1776562372.585545, "ticker": "KXETH15M-26APR182145-45", "seq": 49089, "side": "no"}
+{"type": "delta", "ts": 1776562372.5856783, "ticker": "KXETH15M-26APR182145-45", "seq": 49090, "side": "no"}
+{"type": "delta", "ts": 1776562372.5859892, "ticker": "KXETH15M-26APR182145-45", "seq": 49093, "side": "no"}
+{"type": "delta", "ts": 1776562372.5860927, "ticker": "KXETH15M-26APR182145-45", "seq": 49094, "side": "no"}
+{"type": "delta", "ts": 1776562372.5863965, "ticker": "KXETH15M-26APR182145-45", "seq": 49097, "side": "no"}
+{"type": "delta", "ts": 1776562372.5865095, "ticker": "KXETH15M-26APR182145-45", "seq": 49098, "side": "no"}
+{"type": "delta", "ts": 1776562372.5877447, "ticker": "KXETH15M-26APR182145-45", "seq": 49108, "side": "yes"}
+{"type": "delta", "ts": 1776562372.5879078, "ticker": "KXETH15M-26APR182145-45", "seq": 49109, "side": "yes"}
