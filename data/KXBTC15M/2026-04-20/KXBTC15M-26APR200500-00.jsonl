@@ -76453,3 +76453,4 @@
 {"type": "lifecycle", "ts": 1776675623.3624554, "ticker": "KXBTC15M-26APR200500-00", "seq": 230, "event_type": "determined", "determination_ts": 1776675610, "result": "no", "settlement_value": "0.0000"}
 {"type": "meta", "ticker": "KXBTC15M-26APR200500-00", "series_ticker": null, "title": "BTC price up in next 15 mins?", "yes_sub_title": "Target Price: $74,857.62", "no_sub_title": "Target price: TBD", "floor_strike": 74857.62, "cap_strike": null, "strike_type": "greater_or_equal", "open_time": "2026-04-20T08:45:00Z", "close_time": "2026-04-20T09:00:00Z", "expiration_time": "2026-04-27T09:00:00Z", "market_type": "binary", "result": "no", "status": "finalized", "ts": 1776675623.3624554}
 {"type": "snapshot", "ts": 1776675665.7648058, "ticker": "KXBTC15M-26APR200500-00", "seq": 106595, "yes": [], "no": []}
+{"type": "lifecycle", "ts": 1776675707.9745152, "ticker": "KXBTC15M-26APR200500-00", "seq": 238, "event_type": "settled", "settled_ts": 1776675614}
