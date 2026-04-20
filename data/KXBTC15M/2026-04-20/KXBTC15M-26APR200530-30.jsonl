@@ -49272,3 +49272,4 @@
 {"type": "snapshot", "ts": 1776677456.6029882, "ticker": "KXBTC15M-26APR200530-30", "seq": 13675, "yes": [], "no": []}
 {"type": "lifecycle", "ts": 1776677504.907348, "ticker": "KXBTC15M-26APR200530-30", "seq": 21, "event_type": "settled", "settled_ts": 1776677414}
 {"type": "stats", "ts": 1776677612.0379908, "ticker": "KXBTC15M-26APR200530-30", "last_price": null, "previous_price": null, "volume": null, "volume_24h": null, "dollar_volume": null, "dollar_volume_24h": null, "open_interest": null, "liquidity": null, "yes_bid": null, "yes_ask": null, "no_bid": null, "no_ask": null}
+{"type": "stats", "ts": 1776677935.7695317, "ticker": "KXBTC15M-26APR200530-30", "last_price": null, "previous_price": null, "volume": null, "volume_24h": null, "dollar_volume": null, "dollar_volume_24h": null, "open_interest": null, "liquidity": null, "yes_bid": null, "yes_ask": null, "no_bid": null, "no_ask": null}
