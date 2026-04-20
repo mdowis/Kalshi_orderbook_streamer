@@ -101,7 +101,11 @@ def _local_additions(path: Path, remote_ref: str) -> list[str]:
 def commit_data(message: str) -> bool:
     """Sync local data files to remote and push.
 
-    Strategy (no rebase, no conflicts):
+    When R2_BUCKET is set, git data commits are skipped — R2 is the storage
+    backend and the workflow uploads everything at job end.  This keeps the
+    git repo from growing unboundedly.
+
+    Strategy when git is used (no rebase, no conflicts):
       1. Fetch remote to get its latest state.
       2. Compute which lines each local JSONL file has that remote doesn't.
       3. Hard-reset working tree to remote (eliminates any diverged history).
@@ -113,6 +117,10 @@ def commit_data(message: str) -> bool:
     """
     if not os.environ.get("GITHUB_ACTIONS"):
         print("[storage] Not in GitHub Actions — skipping git commit.")
+        return False
+
+    if os.environ.get("R2_BUCKET"):
+        # R2 is the storage backend; the workflow syncs at job end.
         return False
 
     _clean_git_state()

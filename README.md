@@ -152,10 +152,37 @@ print(f"Spread:        ${spread:.4f}")
 
 Navigate to your repository on GitHub, then go to **Settings → Secrets and variables → Actions → Repository secrets** and click **New repository secret** for each of the following:
 
+**Required:**
+
 | Secret name | Value |
 |-------------|-------|
 | `KALSHI_API_KEY_ID` | The API Key ID string from Kalshi → Account & Security → API Keys |
 | `KALSHI_PRIVATE_KEY` | The full contents of your downloaded `.pem` private key file |
+
+**Recommended — Cloudflare R2 storage** (prevents the git repo from growing unboundedly at ~560 MB/day):
+
+| Secret name | Value |
+|-------------|-------|
+| `R2_ACCOUNT_ID` | Your Cloudflare account ID (found in the R2 dashboard URL) |
+| `R2_ACCESS_KEY_ID` | R2 API token → **Access Key ID** |
+| `R2_SECRET_ACCESS_KEY` | R2 API token → **Secret Access Key** |
+| `R2_BUCKET` | Name of the R2 bucket to store data in |
+
+To create an R2 API token: Cloudflare dashboard → R2 → **Manage R2 API tokens** → **Create API token** with **Object Read & Write** permissions scoped to your bucket.
+
+When `R2_BUCKET` is set, the streamer skips git data commits entirely — the git repo stays small (scripts only) and R2 accumulates all historical JSONL files. Each job uploads its data at the end of the 65-minute session.
+
+**Downloading data from R2 for local analysis:**
+
+```bash
+# Sync all data locally
+aws s3 sync s3://your-bucket/data/ data/ \
+  --endpoint-url https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com
+
+# Then use reconstruct.py as normal
+python scripts/reconstruct.py --list
+python scripts/reconstruct.py KXBTC15M-26APR191500
+```
 
 For `KALSHI_PRIVATE_KEY`, paste the entire PEM block including the header and footer lines:
 ```

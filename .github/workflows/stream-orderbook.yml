@@ -33,7 +33,6 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          # Persist credentials so git push works inside the streamer.
           persist-credentials: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -63,16 +62,54 @@ jobs:
           KALSHI_API_KEY_ID: ${{ secrets.KALSHI_API_KEY_ID }}
           KALSHI_PRIVATE_KEY: ${{ secrets.KALSHI_PRIVATE_KEY }}
           STREAM_DURATION_SECONDS: ${{ github.event.inputs.duration || '3900' }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
 
-      # Flush any data that was written but not yet committed
-      # (e.g. markets still open when the duration timer fired).
-      - name: Final data flush
+      # When R2 is not configured, flush any data not yet committed to git.
+      # When R2 IS configured, git data commits are skipped entirely — R2 is
+      # the source of truth and the step below handles the upload.
+      - name: Final git flush (no-op when R2 is configured)
         if: always()
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: |
+          if [ -n "$R2_BUCKET" ]; then
+            echo "R2 configured — data goes to R2, skipping git data flush."
+            exit 0
+          fi
           git add data/ 2>/dev/null || true
           if ! git diff --cached --quiet; then
             git commit -m "data: final flush $(date -u '+%Y-%m-%d %H:%M') UTC"
-            git push || (git pull --rebase && git push)
+            git fetch origin $GITHUB_REF_NAME
+            git reset --hard origin/$GITHUB_REF_NAME
+            git add data/ 2>/dev/null || true
+            git diff --cached --quiet || git commit -m "data: final flush $(date -u '+%Y-%m-%d %H:%M') UTC"
+            git push
           else
             echo "No uncommitted data to flush."
           fi
+
+      # Upload every JSONL file written this session to Cloudflare R2.
+      # Runs even if the stream step fails so partial data is never lost.
+      # Skips gracefully if R2 secrets are not configured.
+      - name: Sync data to Cloudflare R2
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          if [ -z "$R2_BUCKET" ]; then
+            echo "R2_BUCKET not set — skipping R2 sync."
+            exit 0
+          fi
+          if [ ! -d data ] || [ -z "$(ls -A data 2>/dev/null)" ]; then
+            echo "No data directory to sync."
+            exit 0
+          fi
+          echo "Syncing data/ to s3://${R2_BUCKET}/data/ ..."
+          aws s3 sync data/ "s3://${R2_BUCKET}/data/" \
+            --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+            --no-progress \
+            --only-show-errors
+          echo "R2 sync complete."
