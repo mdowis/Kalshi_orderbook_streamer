@@ -27,7 +27,7 @@ def check_env() -> bool:
     key_id = os.environ.get("KALSHI_API_KEY_ID", "")
     pem    = os.environ.get("KALSHI_PRIVATE_KEY", "")
 
-    print(f"KALSHI_API_KEY_ID  : {'SET  (' + key_id[:8] + '…)' if key_id else '*** MISSING ***'}")
+    print(f"KALSHI_API_KEY_ID  : {'SET  (' + str(len(key_id)) + ' chars)' if key_id else '*** MISSING ***'}")
     print(f"KALSHI_PRIVATE_KEY : {'SET  (' + str(len(pem)) + ' chars)' if pem else '*** MISSING ***'}")
 
     if not key_id or not pem:
@@ -48,8 +48,8 @@ def check_auth() -> bool:
     try:
         from kalshi_auth import get_auth_headers
         headers = get_auth_headers("GET", "/trade-api/v2/markets")
-        for k, v in headers.items():
-            print(f"  {k}: {v[:16]}…")
+        for k in headers:
+            print(f"  {k}: <set>")
         print("\nPASS")
         return True
     except Exception:
