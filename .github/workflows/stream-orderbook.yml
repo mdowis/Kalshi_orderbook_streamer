@@ -1,8 +1,8 @@
 name: Stream Kalshi Orderbook
 
 on:
-  # Fires every hour. Each job streams for 50 minutes then syncs to R2, finishing
-  # comfortably within the 70-minute cap. The next trigger arrives while the current
+  # Fires every hour. Each job streams for 45 minutes then syncs to R2, finishing
+  # well within the 70-minute cap. The next trigger arrives while the current
   # job is still running — concurrency queuing ensures no gap in coverage.
   # If a job crashes, the next trigger fires within at most 1 hour.
   schedule:
@@ -11,9 +11,9 @@ on:
   workflow_dispatch:
     inputs:
       duration:
-        description: 'Stream duration in seconds (default: 3000 = 50 min)'
+        description: 'Stream duration in seconds (default: 2700 = 45 min)'
         required: false
-        default: '3000'
+        default: '2700'
 
 # Only one streaming job at a time. New triggers queue (not cancel) so there
 # is no gap between runs during normal operation.
@@ -24,7 +24,7 @@ concurrency:
 jobs:
   stream:
     runs-on: ubuntu-latest
-    # Hard cap at 70 minutes. Stream runs 50 min; remaining time covers setup + R2 sync.
+    # Hard cap at 70 minutes. Stream runs 45 min; remaining time covers setup + R2 sync.
     timeout-minutes: 70
 
     permissions:
@@ -59,7 +59,7 @@ jobs:
         env:
           KALSHI_API_KEY_ID: ${{ secrets.KALSHI_API_KEY_ID }}
           KALSHI_PRIVATE_KEY: ${{ secrets.KALSHI_PRIVATE_KEY }}
-          STREAM_DURATION_SECONDS: ${{ github.event.inputs.duration || '3000' }}
+          STREAM_DURATION_SECONDS: ${{ github.event.inputs.duration || '2700' }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
 
       # When R2 is not configured, flush any data not yet committed to git.
@@ -109,5 +109,6 @@ jobs:
           aws s3 sync data/ "s3://${R2_BUCKET}/data/" \
             --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
             --no-progress \
-            --only-show-errors
+            --only-show-errors \
+            --size-only
           echo "R2 sync complete."
