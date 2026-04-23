@@ -40,10 +40,6 @@ jobs:
           persist-credentials: true
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 1
-          sparse-checkout: |
-            scripts
-            requirements.txt
-            .env.example
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
